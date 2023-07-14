@@ -15,7 +15,7 @@
  */
 
 import { Span } from '@opentelemetry/api';
-import type { FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import { spanRequestSymbol } from './constants';
 
 export type HandlerOriginal = (() => Promise<unknown>) & (() => void);
@@ -23,3 +23,14 @@ export type HandlerOriginal = (() => Promise<unknown>) & (() => void);
 export type PluginFastifyReply = FastifyReply & {
   [spanRequestSymbol]?: Span[];
 };
+
+export type CjsFastifyModuleExports = () => FastifyInstance;
+
+export type EsmFastifyModuleExports = {
+  default: () => FastifyInstance;
+  fastify: () => FastifyInstance;
+};
+
+export type FastifyModuleExports =
+  | CjsFastifyModuleExports
+  | EsmFastifyModuleExports;

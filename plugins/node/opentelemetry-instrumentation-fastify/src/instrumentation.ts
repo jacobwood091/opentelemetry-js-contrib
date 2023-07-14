@@ -39,10 +39,17 @@ import {
   FastifyNames,
   FastifyTypes,
 } from './enums/AttributeNames';
-import type { HandlerOriginal, PluginFastifyReply } from './internal-types';
+import type {
+  CjsFastifyModuleExports,
+  EsmFastifyModuleExports,
+  FastifyModuleExports,
+  HandlerOriginal,
+  PluginFastifyReply,
+} from './internal-types';
 import type { FastifyInstrumentationConfig } from './types';
 import {
   endSpan,
+  isEsmFastifyModuleExports,
   safeExecuteInTheMiddleMaybePromise,
   startSpan,
 } from './utils';
@@ -197,24 +204,48 @@ export class FastifyInstrumentation extends InstrumentationBase {
     };
   }
 
-  private _patchConstructor(
-    original: () => FastifyInstance
-  ): () => FastifyInstance {
+  private _getPatchedFastifyInstance(module: () => FastifyInstance) {
     const instrumentation = this;
-    this._diag.debug('Patching fastify constructor function');
 
-    function fastify(this: FastifyInstance, ...args: any) {
-      const app: FastifyInstance = original.apply(this, args);
+    return function fastify(this: FastifyInstance, ...args: any) {
+      const app: FastifyInstance = module.apply(this, args);
       app.addHook('onRequest', instrumentation._hookOnRequest());
       app.addHook('preHandler', instrumentation._hookPreHandler());
 
       instrumentation._wrap(app, 'addHook', instrumentation._wrapAddHook());
 
       return app;
-    }
+    };
+  }
 
-    fastify.fastify = fastify;
-    fastify.default = fastify;
+  private _patchConstructor(
+    original: FastifyModuleExports
+  ): () => FastifyInstance {
+    this._diag.debug('Patching fastify constructor function');
+
+    return isEsmFastifyModuleExports(original)
+      ? this._patchConstructorInEsm(original)
+      : this._patchConstructorInCjs(original);
+  }
+
+  private _patchConstructorInEsm(
+    original: EsmFastifyModuleExports
+  ): () => FastifyInstance {
+    const fastify = this._getPatchedFastifyInstance(original.default);
+
+    this._wrap(original, 'default', () => fastify);
+    this._wrap(original, 'fastify', () => fastify);
+
+    return fastify;
+  }
+
+  private _patchConstructorInCjs(
+    original: CjsFastifyModuleExports
+  ): () => FastifyInstance {
+    const fastify = this._getPatchedFastifyInstance(original);
+
+    Object.assign(fastify, { default: fastify, fastify });
+
     return fastify;
   }
 

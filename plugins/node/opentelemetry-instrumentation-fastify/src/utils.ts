@@ -22,7 +22,11 @@ import {
 } from '@opentelemetry/api';
 import { spanRequestSymbol } from './constants';
 
-import type { PluginFastifyReply } from './internal-types';
+import type {
+  EsmFastifyModuleExports,
+  FastifyModuleExports,
+  PluginFastifyReply,
+} from './internal-types';
 
 /**
  * Starts Span
@@ -136,4 +140,14 @@ function isPromise<T>(val: T | Promise<T>): val is Promise<T> {
         'function') ||
     false
   );
+}
+
+/**
+ * Type guard for EsmFastifyModuleExports.
+ * @param module - Fastify's module exports.
+ */
+export function isEsmFastifyModuleExports(
+  module: FastifyModuleExports
+): module is EsmFastifyModuleExports {
+  return 'default' in module;
 }
